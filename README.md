@@ -31,27 +31,21 @@
 ## 🗺️ Architecture (bird’s‑eye)
 
 ```text
-          +----------------- TfL BikePoint (JSON every 60 s) -----------------+
-          |                                                                  |
-          v                                                                  |
-+----------------+      raw snapshots     +----------------+                 |
-|  Ingest Cron   |  ───────────────────→ |   S3 / MinIO    |                 |
-|  (Docker)      |                       +-----------------+                 |
-+-------┬--------+                                                   Weather |
-        |  COPY                                         +-------------------+
-        |                                               |
-        v                                               |
-+----------------+             +----------------+       |
-| Timescale DB   |  features → |  ML trainer    |       |
-|   hypertable   |   ONNX ←──  |  (MLflow)      |       |
-+-------┬--------+             +--------┬-------+       |
-        |                                 |              |
-        | metrics (Prom)                  |              |
-        v                                 v              |
-+----------------+             +----------------+        |
-|   FastAPI      |  ← predict  | Grafana / Loki |  ←─────+
-|  on Fargate    |             +----------------+
-+----------------+
+
+
++-------------+        raw JSON        +-------------+        parquet        +---------------+
+| TfL BikePoint|  ->   S3 / MinIO  ->  |  ETL Worker  |  ->   Feature Store  |   XGBoost /   |
+|  (every 60s) |                       |  (Docker)    |                      |  ONNX Model   |
++-------------+                        +-------------+                       /+---------------+
+       ↑                                       ↓                             /        ↑
+       |                            Prometheus ↓ scrape                      /  FastAPI /predict
+       |                                       ↓                             /         ↓
++-------------+                        +-------------+        Grafana    <--/+-------------+
+|  Weather API | --------------->      |  FastAPI API |   -------------->    |  Front-end  |
++-------------+   merge features       +-------------+     Prom / Loki       +-------------+
+
+
+
 ```
 
 *(Run `make viz` anytime to regenerate this diagram from `/docs/architecture.puml`.)*
