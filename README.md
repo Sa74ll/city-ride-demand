@@ -97,6 +97,6 @@ curl -X POST http://localhost:8000/predict \
 2. `make lint && make test` must pass.
 3. One small feature per PR, please.
 
-For full guidelines see [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md).
+For full guidelines see [`/CONTRIBUTING.md`](/CONTRIBUTING.md).
 
 ![footer](https://raw.githubusercontent.com/Sa74ll/city-ride-demand/main/docs/assets/footer-bike.gif)
