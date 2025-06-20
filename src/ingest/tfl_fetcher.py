@@ -2,6 +2,10 @@ import asyncio
 import json
 from typing import Any, List
 
+import structlog
+
+log = structlog.get_logger()
+
 import aiohttp
 from tenacity import retry, stop_after_attempt
 
@@ -32,6 +36,7 @@ def to_gbfs(rec: dict) -> dict:
 
 def main() -> None:
     data = asyncio.run(fetch())
+    log.info("fetched", stations=len(data))
     print(json.dumps(to_gbfs(data[0]), indent=2))
 
 
