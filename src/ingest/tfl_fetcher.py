@@ -17,10 +17,22 @@ async def fetch() -> List[Any]:
             return await resp.json()
 
 
+def to_gbfs(rec: dict) -> dict:
+    """Convert one TfL station record to a simplified GBFS-style dict."""
+    props = {p["key"]: p["value"] for p in rec["additionalProperties"]}
+    return {
+        "station_id": rec["id"],
+        "name": rec["commonName"],
+        "lat": rec["lat"],
+        "lon": rec["lon"],
+        "bikes": int(props["NbBikes"]),
+        "docks": int(props["NbDocks"]),
+    }
+
+
 def main() -> None:
     data = asyncio.run(fetch())
-    # show one station so we don't flood the terminal
-    print(json.dumps(data[:1], indent=2))
+    print(json.dumps(to_gbfs(data[0]), indent=2))
 
 
 if __name__ == "__main__":
