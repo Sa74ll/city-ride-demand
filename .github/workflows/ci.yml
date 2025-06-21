@@ -1,0 +1,33 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣  get the code
+      - uses: actions/checkout@v4
+
+      # 2️⃣  set up Python 3.12
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # 3️⃣  install Poetry (single-line official installer)
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+
+      # 4️⃣  add Poetry to PATH
+      - name: Add Poetry to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # 5️⃣  install project (incl. dev deps)
+      - name: Install deps
+        run: poetry install --with dev
+
+      # 6️⃣  run tests
+      - name: Run pytest
+        run: poetry run pytest -q
+
