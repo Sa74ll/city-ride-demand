@@ -13,5 +13,19 @@ services:
     volumes:
       - minio-data:/data
 
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: city-ride-timescale
+    environment:
+      POSTGRES_USER: tsadmin
+      POSTGRES_PASSWORD: tspass
+      POSTGRES_DB: bikedb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tsadmin -d bikedb"]
+      interval: 5s
+      retries: 5
+
 volumes:
   minio-data:
