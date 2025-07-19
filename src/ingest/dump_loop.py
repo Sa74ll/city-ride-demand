@@ -11,7 +11,7 @@ from ingest.tfl_fetcher import fetch  # your async fetcher
 S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
 S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minio")
 S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "minio123")
-BUCKET = "raw-bick-status"
+BUCKET = "raw-bike-status"
 
 
 async def ensure_bucket(s3, name: str) -> None:
