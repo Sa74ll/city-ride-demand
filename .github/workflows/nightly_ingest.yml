@@ -1,0 +1,60 @@
+name: Nightly ETL
+
+on:
+  schedule:
+    - cron: '15 2 * * *'   # 02:15 UTC every day
+  workflow_dispatch:       # manual trigger button
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: timescale/timescaledb:pg16-latest
+        ports: [ '5432:5432' ]
+        env:
+          POSTGRES_USER: tsadmin
+          POSTGRES_PASSWORD: tspass
+          POSTGRES_DB: bikedb
+        options: >-
+          --health-cmd="pg_isready -U tsadmin -d bikedb"
+          --health-interval=5s --health-retries=5
+      minio:
+        image: minio/minio:latest
+        command: server /data --console-address ":9001"
+        env:
+          MINIO_ROOT_USER: minio
+          MINIO_ROOT_PASSWORD: minio123
+        ports: [ '9000:9000', '9001:9001' ]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+
+      - name: Install Poetry
+        run: curl -sSL https://install.python-poetry.org | python3 -
+
+      - name: Add Poetry to PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Install deps
+        run: poetry install --with dev
+
+      - name: Load bikes for yesterday
+        env: { TZ: UTC }
+        run: |
+          d=$(date -u -d "yesterday" +%F)
+          poetry run python src/etl/load_day.py "$d"
+
+      - name: Load weather for yesterday
+        env: { TZ: UTC }
+        run: |
+          d=$(date -u -d "yesterday" +%F)
+          poetry run python src/etl/load_weather_day.py "$d"
+
+      - name: Smoke-test join
+        env: { TARGET_DATE: "$(date -u -d "yesterday" +%F)" }
+        run: poetry run python scripts/smoke_test.py
