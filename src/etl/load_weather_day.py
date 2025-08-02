@@ -24,17 +24,26 @@ def url_for(date: str) -> str:
     )
 
 
+def safe_round(val, factor=1):
+    """Return int(round(val * factor)) or 0 if val is None."""
+    if val is None:
+        return 0
+    return round(val * factor)
+
+
 def to_rows(js: dict) -> List[Tuple]:
     hrs = js["hourly"]
-    return [
-        (
-            dt.datetime.fromisoformat(hrs["time"][i]),
-            round(hrs["temperature_2m"][i]),
-            round(hrs["precipitation"][i] * 10),  # mm → 0.1 mm for SMALLINT
-            round(hrs["wind_speed_10m"][i]),
+    rows = []
+    for i in range(len(hrs["time"])):
+        rows.append(
+            (
+                dt.datetime.fromisoformat(hrs["time"][i]),
+                safe_round(hrs["temperature_2m"][i]),
+                safe_round(hrs["precipitation"][i], factor=10),  # 0.1 mm precision
+                safe_round(hrs["wind_speed_10m"][i]),
+            )
         )
-        for i in range(len(hrs["time"]))
-    ]
+    return rows
 
 
 async def fetch(date: str) -> List[Tuple]:
@@ -48,18 +57,40 @@ async def upsert(rows: List[Tuple]) -> None:
     if not rows:
         print("⚠️  No weather rows, nothing inserted")
         return
+
     async with await psycopg.AsyncConnection.connect(PG_DSN) as conn:
         async with conn.cursor() as cur:
+            # 1) create temp staging table
+            await cur.execute(
+                """
+                CREATE TEMP TABLE _wx_stage (
+                    ts TIMESTAMPTZ,
+                    air_temp SMALLINT,
+                    precip_tenth_mm SMALLINT,
+                    wind_kph SMALLINT
+                ) ON COMMIT DROP;
+            """
+            )
+
+            # 2) COPY into the temp table
             buf = io.StringIO("\n".join("\t".join(map(str, r)) for r in rows) + "\n")
-            async with cur.copy(
-                """
-                COPY weather_hourly (ts, air_temp, precip_tenth_mm, wind_kph)
-                FROM STDIN
-                """
-            ) as cp:
+            async with cur.copy("COPY _wx_stage FROM STDIN") as cp:
                 await cp.write(buf.read())
+
+            # 3) Merge into the real hypertable (ignore duplicates)
+            await cur.execute(
+                """
+                INSERT INTO weather_hourly
+                SELECT * FROM _wx_stage
+                ON CONFLICT (ts) DO UPDATE
+                  SET air_temp = EXCLUDED.air_temp,
+                      precip_tenth_mm = EXCLUDED.precip_tenth_mm,
+                      wind_kph = EXCLUDED.wind_kph;
+            """
+            )
+
         await conn.commit()
-    print(f"✔ Inserted {len(rows)} weather rows")
+    print(f"✔ Upserted {len(rows)} weather rows")
 
 
 async def main(day: str):
